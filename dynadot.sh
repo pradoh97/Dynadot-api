@@ -51,7 +51,9 @@ function install-prereqs(){
   fi
 }
 
-#Get dns settings
+install-prereqs
+
+#Get dns current settings
 curl -s -o $responseFile "https://api.dynadot.com/api3.xml?key=${apiKey}&command=get_dns&domain=${domain}"
 
 #Check if response is valid
@@ -63,7 +65,7 @@ if [ "$responseCode" -ne 0 ]; then
     if [ ${#apiKey} -lt 42 ];then
       writeLog "The API key should be 42 characters long, this one is ${#apiKey}"
     fi
-    
+
     exit 1
 fi
 
@@ -76,20 +78,20 @@ mainRecords=""
 index=0
 while [ $index -lt "$mainEntriesCount" ]; do
 
-    # IMPORTANT: The XML-nodes index starts at 1!
+    # XML-nodes index starts at 1
     xmlIndex=$index+1
 
     # Read and store the type of the current main record
     type="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/RecordType/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
     
-    #Makes the type lowercase and removes trailing or leading spaces
+    # Make the type lowercase and removes trailing or leading spaces
     type=${type,,}
     type=$(echo "$type" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
     # Read and store the value of the current main record
     value="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
     
-    #Encodes special chars for parameters
+    # Encode special chars for parameters
     value=$(jq -rn --arg x "$value" '$x|@uri')
     value2=$(jq -rn --arg x "$value2" '$x|@uri')
 
@@ -163,9 +165,6 @@ if [ $unchanged -eq 1 ]; then
     subRecords+="&subdomain$index=$newRecord&sub_record_type$index=txt&sub_record$index=$CERTBOT_VALIDATION"
     #exit 2
 fi
-
-#Replaced, ansible playbook installs it
-install-prereqs
 
 # Combine everything into one api command/request
 apiRequest="key=$apiKey&command=set_dns2&domain=$domain$mainRecords$subRecords"
