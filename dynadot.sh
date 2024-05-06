@@ -18,16 +18,21 @@ newRecord="_acme-challenge.$subdomain"
 [[ "${subdomain}" == '*' ]]  && newRecord="_acme-challenge"
 
 echo '----------Begin log----------' >> $logFile
-echo "Subdomain: $subdomain" >> $logFile
-echo "Domain: $domain" >> $logFile
-echo "Certbot_domain: $CERTBOT_DOMAIN" >> $logFile
-echo "Certbot_validation: $CERTBOT_VALIDATION" >> $logFile
+echo "Will attempt creating $newRecord for $domain with value $CERTBOT_VALIDATION"
 
-#Installs libxml2-utils
-function install-libxml(){
+#Installs libxml2-utils and jq
+function install-prereqs(){
   libxmlInstalled=$(apt -qq list libxml2-utils 2>/dev/null | grep "instal")
+  jqInstalled=$(apt -qq list jq 2>/dev/null | grep "instal")
+  
   if [[ ! -n $libxmlInstalled ]]; then
+    echo "Installing libxml2-utils"
     apt install libxml2-utils -y
+  fi
+
+  if [[ ! -n $jqInstalled ]]; then
+    echo "Installing jq"
+    apt install jq -y
   fi
 }
 
@@ -139,7 +144,7 @@ if [ $unchanged -eq 1 ]; then
 fi
 
 #Replaced, ansible playbook installs it
-#install-libxml
+install-prereqs
 
 # Combine everything into one api command/request
 apiRequest="key=$apiKey&command=set_dns2&domain=$domain$mainRecords$subRecords"

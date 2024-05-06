@@ -1,3 +1,7 @@
 TODO:
  - Store somewhere the last record added(value + type + subdomain). Enabling deletion after the challenge is done or granting the ability to update it, in order for renewals to work and to avoid creating tons of records.
  - Create readme and add usage examples
+ 
+ Flags to add:
+ - Manual run (prompt for super user password for installing dependencies)
+ - Unatended run (asumes runing as superuser)
