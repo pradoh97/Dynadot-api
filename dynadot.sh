@@ -17,11 +17,22 @@ subdomainNodes="$domainNodes/SubDomains"
 newRecord="_acme-challenge.$subdomain"
 [[ "${subdomain}" == '*' ]]  && newRecord="_acme-challenge"
 
+###
+# Writes to a log file ($logFile), by default it writes <hh:mm:ss message>.
+# $1 the <message> to be writen
+#
+# $2: set it to 1 to include the day, month and year before hh:mm:ss
+# omit or use any other value to keep the default format.
 function writeLog(){
-  echo "[$(date +'%H:%M:%S')] $1" >> $logFile
+  if [ $2 == 1 ]; then
+    #Output includes the day, month and year
+    echo "[$(date +'%D %H:%M:%S')] $1" >> $logFile
+  else
+    echo "[$(date +'%H:%M:%S')] $1" >> $logFile
+  fi
 }
 
-writeLog '----------Begin log----------'
+writeLog '----------Begin log----------' 1
 writeLog "Will attempt creating $newRecord for $domain with value $CERTBOT_VALIDATION"
 
 #Installs libxml2-utils and jq
