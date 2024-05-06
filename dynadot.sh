@@ -93,12 +93,15 @@ while [ $index -lt "$mainEntriesCount" ]; do
     
     # Encode special chars for parameters
     value=$(jq -rn --arg x "$value" '$x|@uri')
-    value2=$(jq -rn --arg x "$value2" '$x|@uri')
 
     # Reformat the received data into the needed API-format and append it to the mainRecords variable
     if [[ $type == "mx" ]]; then
+      
       value2="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value2/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+      value2=$(jq -rn --arg x "$value2" '$x|@uri')
+      
       mainRecords+="&main_record_type$index=$type&main_record$index=$value&main_recordx$index=$value2"
+
     else
       mainRecords+="&main_record_type$index=$type&main_record$index=$value"
     fi
@@ -143,11 +146,12 @@ while [ $index -le "$subEntriesCount" ]; do
 
       #Encodes special chars for parameters
       value=$(jq -rn --arg x "$value" '$x|@uri')
-      value2=$(jq -rn --arg x "$value2" '$x|@uri')
 
       # Reformat the received data into the needed API-format and append it to the subRecords variable
       if [[ $type == "mx" ]]; then
         value2="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Value2/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+        value2=$(jq -rn --arg x "$value2" '$x|@uri')
+        
         subRecords+="&subdomain$index=$subhost&sub_record_type$index=$type&sub_record$index=$value&sub_recordx$index=$value"
       else
         subRecords+="&subdomain$index=$subhost&sub_record_type$index=$type&sub_record$index=$value"
