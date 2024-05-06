@@ -17,8 +17,12 @@ subdomainNodes="$domainNodes/SubDomains"
 newRecord="_acme-challenge.$subdomain"
 [[ "${subdomain}" == '*' ]]  && newRecord="_acme-challenge"
 
-echo '----------Begin log----------' >> $logFile
-echo "Will attempt creating $newRecord for $domain with value $CERTBOT_VALIDATION"
+function writeLog(){
+  echo "[$(date +'%H:%M:%S')] $1" >> $logFile
+}
+
+writeLog '----------Begin log----------'
+writeLog "Will attempt creating $newRecord for $domain with value $CERTBOT_VALIDATION"
 
 #Installs libxml2-utils and jq
 function install-prereqs(){
@@ -26,12 +30,12 @@ function install-prereqs(){
   jqInstalled=$(apt -qq list jq 2>/dev/null | grep "instal")
   
   if [[ ! -n $libxmlInstalled ]]; then
-    echo "Installing libxml2-utils"
+    writeLog "Installing libxml2-utils"
     apt install libxml2-utils -y
   fi
 
   if [[ ! -n $jqInstalled ]]; then
-    echo "Installing jq"
+    writeLog "Installing jq"
     apt install jq -y
   fi
 }
@@ -42,7 +46,7 @@ curl -s -o $responseFile "https://api.dynadot.com/api3.xml?key=${apiKey}&command
 #Check if response is valid
 responseCode="$(echo "cat /GetDnsResponse/GetDnsHeader/ResponseCode/text()" | xmllint --nocdata --shell ${responseFile} | sed '1d;$d')"
 if [ "$responseCode" -ne 0 ]; then
-    echo "Error: Response Code not 0, was $responseCode instead!" >> $logFile
+    writeLog "Error: Response Code not 0, was $responseCode instead!"
     exit 1
 fi
 
@@ -136,8 +140,8 @@ done
 # Throw error and abort if no records where changed
 if [ $unchanged -eq 1 ]; then
     index=$(($index - 1))
-    echo "Error: Challenge Node $newRecord not found, no changes to DNS-record performed!" >> $logFile
-    echo "Will create $newRecord on index $index with value $CERTBOT_VALIDATION" >> $logFile
+    writeLog "Error: Challenge Node $newRecord not found, no changes to DNS-record performed!"
+    writeLog "Will create $newRecord on index $index with value $CERTBOT_VALIDATION"
 
     subRecords+="&subdomain$index=$newRecord&sub_record_type$index=txt&sub_record$index=$CERTBOT_VALIDATION"
     #exit 2
