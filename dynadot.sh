@@ -50,14 +50,13 @@ newRecord="_acme-challenge.$subdomain"
 # $2: set it to 1 to include the day, month and year before hh:mm:ss
 # omit or use any other value to keep the default format.
 function writeLog(){
-  if [ $2 == 1 ]; then
-    #Output includes the day, month and year
+  if [ ! -z $2 ] && [ $2 -eq 1 ]; then
+    # Output includes the day, month and year
     echo "[$(date +'%D %H:%M:%S')] $1" >> $logFile
   else
     echo "[$(date +'%H:%M:%S')] $1" >> $logFile
   fi
 }
-
 writeLog '----------Begin log----------' 1
 writeLog "Will attempt creating $newRecord for $domain with value $CERTBOT_VALIDATION"
 
@@ -160,9 +159,9 @@ function formatSubRecords(){
             # Set the flag to indicate that the record exists
             recordExists=1
 
-            if [ $value -ne $CERTBOT_VALIDATION ]; then
+            if [ $value != "$CERTBOT_VALIDATION" ]; then
               # Overwrite the value that is stored in the TXT-record to the needed challenge key
-              value=$CERTBOT_VALIDATION
+              value="$CERTBOT_VALIDATION"
 
               # Unset flag to indicate that a record was indeed changed
               recordChanged=1
@@ -218,7 +217,7 @@ getCurrentDNSSetings
 formatMainRecords
 formatSubRecords
 
-if [ $changesIntroduced -eq 1 ]; then
+if [ $(changesIntroduced) -eq 1 ]; then
   # Combine everything into one api command/request
   apiRequest="key=$apiKey&command=set_dns2&domain=$domain$mainRecords$subRecords"
 
