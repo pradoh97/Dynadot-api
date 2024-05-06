@@ -57,7 +57,13 @@ curl -s -o $responseFile "https://api.dynadot.com/api3.xml?key=${apiKey}&command
 #Check if response is valid
 responseCode="$(echo "cat /GetDnsResponse/GetDnsHeader/ResponseCode/text()" | xmllint --nocdata --shell ${responseFile} | sed '1d;$d')"
 if [ "$responseCode" -ne 0 ]; then
-    writeLog "Error: Response Code not 0, was $responseCode instead!"
+    writeLog "Error: Response Code $responseCode"
+
+    #Api keys from dynadot are 42 chars long
+    if [ ${#apiKey} -lt 42 ];then
+      writeLog "The API key should be 42 characters long, this one is ${#apiKey}"
+    fi
+    
     exit 1
 fi
 
