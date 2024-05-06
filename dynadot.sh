@@ -7,7 +7,11 @@ subdomain=$(expr match "$CERTBOT_DOMAIN" '\(.*\)\..*\..*')
 
 apiKey=$(cat ./apikey)
 apiUrl="https://api.dynadot.com/api3.json"
-responseFile="./apiResponse.xml"
+
+#Response of the get_dns and set_dns2 methods from Dynadot API
+getResponseFile="./getResponse.xml"
+setResponseFile="./setResponse.xml"
+
 logFile="./logfile.log"
 domainNodes="/GetDnsResponse/GetDnsContent/NameServerSettings"
 maindomainNodes="$domainNodes/MainDomains"
@@ -54,10 +58,10 @@ function install-prereqs(){
 install-prereqs
 
 #Get dns current settings
-curl -s -o $responseFile "https://api.dynadot.com/api3.xml?key=${apiKey}&command=get_dns&domain=${domain}"
+curl -s -o $getResponseFile "https://api.dynadot.com/api3.xml?key=${apiKey}&command=get_dns&domain=${domain}"
 
 #Check if response is valid
-responseCode="$(echo "cat /GetDnsResponse/GetDnsHeader/ResponseCode/text()" | xmllint --nocdata --shell ${responseFile} | sed '1d;$d')"
+responseCode="$(echo "cat /GetDnsResponse/GetDnsHeader/ResponseCode/text()" | xmllint --nocdata --shell ${getResponseFile} | sed '1d;$d')"
 if [ "$responseCode" -ne 0 ]; then
     writeLog "Error: Response Code $responseCode"
 
@@ -69,7 +73,7 @@ if [ "$responseCode" -ne 0 ]; then
     exit 1
 fi
 
-mainEntriesCount="$(xmllint --xpath "count($maindomainNodes/*)" $responseFile)"
+mainEntriesCount="$(xmllint --xpath "count($maindomainNodes/*)" $getResponseFile)"
 
 # Initialize empty string for storing the previous main domain records in API-call format
 mainRecords=""
@@ -82,14 +86,14 @@ while [ $index -lt "$mainEntriesCount" ]; do
     xmlIndex=$index+1
 
     # Read and store the type of the current main record
-    type="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/RecordType/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+    type="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/RecordType/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
     
     # Make the type lowercase and removes trailing or leading spaces
     type=${type,,}
     type=$(echo "$type" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
     # Read and store the value of the current main record
-    value="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+    value="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
     
     # Encode special chars for parameters
     value=$(jq -rn --arg x "$value" '$x|@uri')
@@ -97,7 +101,7 @@ while [ $index -lt "$mainEntriesCount" ]; do
     # Reformat the received data into the needed API-format and append it to the mainRecords variable
     if [[ $type == "mx" ]]; then
       
-      value2="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value2/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+      value2="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value2/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
       value2=$(jq -rn --arg x "$value2" '$x|@uri')
       
       mainRecords+="&main_record_type$index=$type&main_record$index=$value&main_recordx$index=$value2"
@@ -109,7 +113,7 @@ while [ $index -lt "$mainEntriesCount" ]; do
     ((index++))
 done
 
-subEntriesCount="$(xmllint --xpath "count($subdomainNodes/*)" $responseFile)"
+subEntriesCount="$(xmllint --xpath "count($subdomainNodes/*)" $getResponseFile)"
 
 # Initialize empty string for storing the subdomain records in API-call format
 subRecords=""
@@ -124,17 +128,17 @@ while [ $index -le "$subEntriesCount" ]; do
     # IMPORTANT: The XML-nodes index starts at 1!
     xmlIndex=$index+1
 
-    subhost="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Subhost/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
-    type="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/RecordType/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+    subhost="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Subhost/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
+    type="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/RecordType/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
     
     #Makes the type lowercase and removes trailing or leading spaces
     type=${type,,}
     type=$(echo "$type" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
-    value="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Value/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+    value="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Value/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
 
     if [ -n "$type" ]; then
-      # Check if the subdomain of the current record is the one that needs to be changed
+      # Check if the record exists and replace the current value.
       if [ "$subhost" = $newRecord ] && [ $type == "txt" ]; then
           # Overwrite the value that is stored in the TXT-record to the needed challenge key
           value=$CERTBOT_VALIDATION
@@ -144,14 +148,14 @@ while [ $index -le "$subEntriesCount" ]; do
           echo "Found"
       fi
 
-      #Encodes special chars for parameters
+      # Encode special chars for parameters
       value=$(jq -rn --arg x "$value" '$x|@uri')
 
       # Reformat the received data into the needed API-format and append it to the subRecords variable
       if [[ $type == "mx" ]]; then
-        value2="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Value2/text()" | xmllint --nocdata --shell $responseFile | sed '1d;$d')"
+        value2="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Value2/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
         value2=$(jq -rn --arg x "$value2" '$x|@uri')
-        
+
         subRecords+="&subdomain$index=$subhost&sub_record_type$index=$type&sub_record$index=$value&sub_recordx$index=$value"
       else
         subRecords+="&subdomain$index=$subhost&sub_record_type$index=$type&sub_record$index=$value"
@@ -160,14 +164,14 @@ while [ $index -le "$subEntriesCount" ]; do
     
     ((index++))
 done
-# Throw error and abort if no records where changed
+
+# Create the record if it does not exist
 if [ $unchanged -eq 1 ]; then
     index=$(($index - 1))
-    writeLog "Error: Challenge Node $newRecord not found, no changes to DNS-record performed!"
-    writeLog "Will create $newRecord on index $index with value $CERTBOT_VALIDATION"
+    writeLog "Challenge record $newRecord not found."
+    writeLog "Will create $newRecord on index $index with value $CERTBOT_VALIDATION."
 
     subRecords+="&subdomain$index=$newRecord&sub_record_type$index=txt&sub_record$index=$CERTBOT_VALIDATION"
-    #exit 2
 fi
 
 # Combine everything into one api command/request
@@ -175,5 +179,7 @@ apiRequest="key=$apiKey&command=set_dns2&domain=$domain$mainRecords$subRecords"
 
 # Combine api-url and -request into the finished command
 fullRequest="$apiUrl?$apiRequest"
-curl -s "$fullRequest" > $responseFile
+curl -s "$fullRequest" > $setResponseFile
+
+# For DNS propagation
 sleep 60
