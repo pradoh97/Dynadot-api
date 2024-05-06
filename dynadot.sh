@@ -8,7 +8,7 @@ domain=$(expr match "$CERTBOT_DOMAIN" '.*\.\(.*\..*\)')
 #Extracts a subdomain, for www.example.com it would extract www
 subdomain=$(expr match "$CERTBOT_DOMAIN" '\(.*\)\..*\..*')
 
-apiKey="your api key"
+apiKey=$(cat ./apikey)
 apiUrl="https://api.dynadot.com/api3.json"
 getResponseFile="/tmp/apiResponse.xml"
 logFile="/tmp/logfile.log"
