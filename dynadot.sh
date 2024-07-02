@@ -5,14 +5,16 @@ domain=$(expr match "$CERTBOT_DOMAIN" '.*\.\(.*\..*\)')
 #Extracts a subdomain, for www.example.com it would extract www
 subdomain=$(expr match "$CERTBOT_DOMAIN" '\(.*\)\..*\..*')
 
-apiKey=$(cat ./apikey)
+scriptDir=$(dirname $0)
+
+apiKey=$(cat "$scriptDir/apikey")
 apiUrl="https://api.dynadot.com/api3.json"
 
 #Response of the get_dns and set_dns2 methods from Dynadot API
-getResponseFile="./getResponse.xml"
-setResponseFile="./setResponse.xml"
+getResponseFile="$scriptDir/getResponse.xml"
+setResponseFile="$scriptDir/setResponse.xml"
 
-logFile="./logfile.log"
+logFile="$scriptDir/logfile.log"
 domainNodes="/GetDnsResponse/GetDnsContent/NameServerSettings"
 maindomainNodes="$domainNodes/MainDomains"
 subdomainNodes="$domainNodes/SubDomains"
@@ -64,7 +66,12 @@ writeLog "Will attempt creating $newRecord for $domain with value $CERTBOT_VALID
 function installPrereqs(){
   libxmlInstalled=$(apt -qq list libxml2-utils 2>/dev/null | grep "instal")
   jqInstalled=$(apt -qq list jq 2>/dev/null | grep "instal")
+  curlInstalled=$(apt -qq list curl 2>/dev/null | grep "instal")
   
+  if [[ ! -n $curlInstalled ]]; then
+    writeLog "Installing curl"
+    apt install curl -y
+  fi
   if [[ ! -n $libxmlInstalled ]]; then
     writeLog "Installing libxml2-utils"
     apt install libxml2-utils -y
@@ -74,7 +81,7 @@ function installPrereqs(){
     writeLog "Installing jq"
     apt install jq -y
   fi
-}
+  }
 
 #Get dns current settings
 function getCurrentDNSSetings(){
@@ -107,23 +114,23 @@ function formatMainRecords(){
 
       # Read and store the type of the current main record
       type="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/RecordType/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
-      
+
       # Make the type lowercase and removes trailing or leading spaces
       type=${type,,}
       type=$(echo "$type" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
       # Read and store the value of the current main record
       value="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
-      
+
       # Encode special chars for parameters
       value=$(jq -rn --arg x "$value" '$x|@uri')
 
       # Reformat the received data into the needed API-format and append it to the mainRecords variable
       if [[ $type == "mx" ]]; then
-        
+
         value2="$(echo "cat $maindomainNodes/MainDomainRecord[$xmlIndex]/Value2/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
         value2=$(jq -rn --arg x "$value2" '$x|@uri')
-        
+
         mainRecords+="&main_record_type$index=$type&main_record$index=$value&main_recordx$index=$value2"
 
       else
@@ -146,11 +153,11 @@ function formatSubRecords(){
 
       subhost="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Subhost/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
       type="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/RecordType/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
-      
+
       #Makes the type lowercase and removes trailing or leading spaces
       type=${type,,}
       type=$(echo "$type" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-
+      
       value="$(echo "cat $subdomainNodes/SubDomainRecord[$xmlIndex]/Value/text()" | xmllint --nocdata --shell $getResponseFile | sed '1d;$d')"
 
       if [ -n "$type" ]; then
@@ -183,7 +190,7 @@ function formatSubRecords(){
           subRecords+="&subdomain$index=$subhost&sub_record_type$index=$type&sub_record$index=$value"
         fi
       fi
-      
+
       lastRecordIndex=$index
       ((index++))
   done
@@ -192,12 +199,11 @@ function formatSubRecords(){
 # Returns 1 if there are changes to be pushed via set_dns2 API call.
 # Returns 0 if no changes are needed (does not do an API call)
 function changesIntroduced(){
-  
   doChanges=0
 
   if [ $recordExists -eq 0 ]; then
     doChanges=1
-    $recordIndex = $lastRecordIndex
+    recordIndex=$lastRecordIndex
     writeLog "Challenge record $newRecord not found."
     writeLog "Will create $newRecord on index $recordIndex with value $CERTBOT_VALIDATION."
   fi
@@ -206,26 +212,24 @@ function changesIntroduced(){
     writeLog "Challenge record $newRecord found."
     writeLog "Will replace $newRecord value, on index $recordIndex, with $CERTBOT_VALIDATION."
   fi
-
   subRecords+="&subdomain$recordIndex=$newRecord&sub_record_type$recordIndex=txt&sub_record$recordIndex=$CERTBOT_VALIDATION"
-
-  echo $doChanges
 }
 
 installPrereqs
 getCurrentDNSSetings
 formatMainRecords
 formatSubRecords
+changesIntroduced
 
-if [ $(changesIntroduced) -eq 1 ]; then
+if [ $doChanges -eq 1 ]; then
   # Combine everything into one api command/request
+  writeLog $subRecords
   apiRequest="key=$apiKey&command=set_dns2&domain=$domain$mainRecords$subRecords"
-
   # Combine api-url and -request into the finished command
   fullRequest="$apiUrl?$apiRequest"
-  curl -s "$fullRequest" > $setResponseFile
+    #writeLog $fullRequest
+  #curl -s "$fullRequest" > $setResponseFile
 
   # For DNS propagation
-  sleep 60
+#  sleep 60
 fi
-
