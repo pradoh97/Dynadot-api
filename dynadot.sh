@@ -229,5 +229,5 @@ if [ $doChanges -eq 1 ]; then
   curl -s "$fullRequest" > $setResponseFile
 
   # For DNS propagation
-#  sleep 60
+  sleep 60
 fi
