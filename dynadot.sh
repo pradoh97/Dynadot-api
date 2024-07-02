@@ -223,12 +223,10 @@ changesIntroduced
 
 if [ $doChanges -eq 1 ]; then
   # Combine everything into one api command/request
-  writeLog $subRecords
   apiRequest="key=$apiKey&command=set_dns2&domain=$domain$mainRecords$subRecords"
   # Combine api-url and -request into the finished command
   fullRequest="$apiUrl?$apiRequest"
-    #writeLog $fullRequest
-  #curl -s "$fullRequest" > $setResponseFile
+  curl -s "$fullRequest" > $setResponseFile
 
   # For DNS propagation
 #  sleep 60
