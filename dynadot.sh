@@ -1,9 +1,16 @@
 #!/bin/bash
-#includes TLD: example.com
-domain=$(expr match "$CERTBOT_DOMAIN" '.*\.\(.*\..*\)')
+# Extract Main Domain (assumes standard structure like example.com)
+# NOTE: If using a double TLD like .co.uk, change -f1-2 to -f1-3 below
+domain=$(echo "$CERTBOT_DOMAIN" | rev | cut -d. -f1-2 | rev)
 
-#Extracts a subdomain, for www.example.com it would extract www
-subdomain=$(expr match "$CERTBOT_DOMAIN" '\(.*\)\..*\..*')
+# Extract Subdomain
+if [ "$CERTBOT_DOMAIN" == "$domain" ]; then
+    # It is a root domain (example.com), so subdomain is empty
+    subdomain=""
+else
+    # It is a subdomain (www.example.com), remove the domain part
+    subdomain=${CERTBOT_DOMAIN%.$domain}
+fi
 
 scriptDir=$(dirname $0)
 
@@ -42,8 +49,11 @@ recordIndex=0
 lastRecordIndex=0
 
 #The subdomain key in dynadot
-newRecord="_acme-challenge.$subdomain"
-[[ "${subdomain}" == '*' ]]  && newRecord="_acme-challenge"
+if [ -z "$subdomain" ] || [ "$subdomain" == "*" ]; then
+    newRecord="_acme-challenge"
+else
+    newRecord="_acme-challenge.$subdomain"
+fi
 
 ###
 # Writes to a log file ($logFile), by default it writes <hh:mm:ss message>.
