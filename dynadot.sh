@@ -1,4 +1,5 @@
 #!/bin/bash
+# The amount of TLDs the domain has. By default 1, "example.com". Call the script with -d to use a domain like "example.com.ar"
 tlds=1
 
 while getopts "d" opt; do
