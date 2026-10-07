@@ -1,7 +1,16 @@
 #!/bin/bash
+tlds=1
+
+while getopts "d" opt; do
+    case $opt in
+        d)
+            tlds=2
+            ;;
+    esac
+done
+
 # Extract Main Domain (assumes standard structure like example.com)
-# NOTE: If using a double TLD like .co.uk, change -f1-2 to -f1-3 below
-domain=$(echo "$CERTBOT_DOMAIN" | rev | cut -d. -f1-2 | rev)
+domain=$(echo "$CERTBOT_DOMAIN" | rev | cut -d. -f1-$(( $tlds+1 )) | rev)
 
 # Extract Subdomain
 if [ "$CERTBOT_DOMAIN" == "$domain" ]; then
